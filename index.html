@@ -1,0 +1,604 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font:14px system-ui,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style>
+<title>London Rail Pulse</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap">
+</head>
+<body>
+<style>
+/* Layout: full-height control room — status rail on the left, live geo map filling the rest; stacks on phones. */
+:root{
+  --bg:#eef1f4; --surface:#ffffff; --sunk:#f5f7f9; --ink:#14202b; --muted:#5b6b7a; --rule:#d7dee5;
+  --accent:#1f4fd1; --map:#e3e8ed; --river:#b8d2e6;
+  --good:#1d8a4b; --minor:#b87d00; --severe:#c8322b; --closed:#7a8794;
+  --quiet:#3a9d6a; --moderate:#d49a1a; --busy:#d2452f;
+  --f-display:"Archivo","Helvetica Neue",Arial,sans-serif;
+  --f-body:"Inter",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0e1318; --surface:#151c23; --sunk:#111820; --ink:#e5ebf0; --muted:#94a4b3; --rule:#25303a;
+  --accent:#8aaeff; --map:#121920; --river:#1d3346;
+  --good:#3fbf74; --minor:#f0b429; --severe:#ff6b5e; --closed:#7d8b98;
+  --quiet:#46b97c; --moderate:#e9ae32; --busy:#ff6a52; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0e1318; --surface:#151c23; --sunk:#111820; --ink:#e5ebf0; --muted:#94a4b3; --rule:#25303a;
+  --accent:#8aaeff; --map:#121920; --river:#1d3346;
+  --good:#3fbf74; --minor:#f0b429; --severe:#ff6b5e; --closed:#7d8b98;
+  --quiet:#46b97c; --moderate:#e9ae32; --busy:#ff6a52; color-scheme:dark}
+
+html,body{height:100%}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:14px;line-height:1.45;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
+  padding-block:12px;box-sizing:border-box;display:flex;flex-direction:column;gap:12px;overflow:hidden}
+*,*::before,*::after{box-sizing:border-box}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+header.top{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.brand{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+.brand h1{font-family:var(--f-display);font-weight:800;font-size:22px;letter-spacing:-.01em;margin:0;text-wrap:balance}
+.brand span{color:var(--muted);font-size:13px}
+.meta{display:flex;align-items:center;gap:10px;font-size:12px;color:var(--muted)}
+.src{display:inline-flex;align-items:center;gap:6px;padding:3px 9px;border-radius:999px;border:1px solid var(--rule);background:var(--surface);font-weight:500;color:var(--ink)}
+.src i{width:8px;height:8px;border-radius:50%;background:var(--closed)}
+.src.live i{background:var(--good);box-shadow:0 0 0 0 var(--good);animation:ping 2s infinite}
+.src.example i{background:var(--minor)}
+@keyframes ping{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--good) 60%,transparent)}100%{box-shadow:0 0 0 7px transparent}}
+.mono{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.iconbtn{border:1px solid var(--rule);background:var(--surface);border-radius:6px;padding:4px 10px;cursor:pointer;font-size:12px}
+.iconbtn:hover{border-color:var(--accent)}
+
+.banner{background:color-mix(in srgb,var(--minor) 14%,var(--surface));border:1px solid color-mix(in srgb,var(--minor) 45%,var(--rule));
+  border-radius:8px;padding:8px 12px;font-size:13px}
+.banner b{font-weight:600}
+
+.app{flex:1;min-height:0;display:grid;grid-template-columns:minmax(300px,370px) 1fr;gap:12px}
+aside{min-height:0;min-width:0;overflow:auto;display:flex;flex-direction:column;gap:14px;padding-right:2px}
+.mapwrap{position:relative;min-width:0;min-height:0;border-radius:10px;overflow:hidden;border:1px solid var(--rule);background:var(--map)}
+#map{position:absolute;inset:0;background:var(--map)}
+
+.sec h2{font-family:var(--f-display);font-weight:600;font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);margin:0 0 8px}
+.tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.tile{background:var(--surface);border:1px solid var(--rule);border-radius:8px;padding:9px 11px;display:flex;flex-direction:column;gap:2px}
+.tile b{font-family:var(--f-display);font-weight:800;font-size:26px;line-height:1}
+.tile span{font-size:12px;color:var(--muted)}
+.tile.good b{color:var(--good)} .tile.minor b{color:var(--minor)} .tile.severe b{color:var(--severe)}
+
+.corridor{display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--rule);border-radius:8px;overflow:hidden}
+.corridor .hd{display:flex;justify-content:space-between;align-items:baseline;padding:8px 11px;border-bottom:1px solid var(--rule);background:var(--sunk);font-size:12px;color:var(--muted)}
+.corridor .hd b{font-family:var(--f-display);font-weight:600;color:var(--ink);font-size:13px}
+
+ul.lines{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.corridor ul.lines li+li{border-top:1px solid var(--rule)}
+.alllines{background:var(--surface);border:1px solid var(--rule);border-radius:8px;overflow:hidden}
+.alllines ul.lines li+li{border-top:1px solid var(--rule)}
+.row{width:100%;display:grid;grid-template-columns:6px 1fr auto;align-items:center;gap:10px;padding:8px 11px;background:none;border:0;text-align:left;cursor:pointer}
+.row:hover{background:var(--sunk)}
+.row.is-sel{background:color-mix(in srgb,var(--accent) 9%,var(--surface))}
+.sw{width:6px;height:28px;border-radius:2px}
+.nm{display:flex;flex-direction:column;min-width:0;font-weight:600}
+.nm small{font-weight:400;color:var(--muted);font-size:11.5px}
+.pill{font-size:11.5px;font-weight:600;padding:2px 8px;border-radius:999px;white-space:nowrap;border:1px solid transparent}
+.pill.good{color:var(--good);background:color-mix(in srgb,var(--good) 12%,transparent)}
+.pill.minor{color:var(--minor);background:color-mix(in srgb,var(--minor) 15%,transparent);border-color:color-mix(in srgb,var(--minor) 35%,transparent)}
+.pill.severe{color:#fff;background:var(--severe)}
+.pill.closed,.pill.unknown{color:var(--muted);background:color-mix(in srgb,var(--closed) 14%,transparent)}
+.detail{padding:0 11px 10px 27px;font-size:13px;color:var(--ink);display:flex;flex-direction:column;gap:6px;max-width:65ch}
+.detail p{margin:0}
+.detail .muted{color:var(--muted)}
+
+.crowd{background:var(--surface);border:1px solid var(--rule);border-radius:8px;padding:10px 11px;display:flex;flex-direction:column;gap:6px}
+.crowd .note{font-size:12px;color:var(--muted);margin:0 0 4px}
+.crow{display:grid;grid-template-columns:minmax(0,9.5em) 1fr 3.2em;align-items:center;gap:8px;font-size:12.5px;cursor:pointer;background:none;border:0;padding:1px 0;text-align:left;width:100%}
+.crow .cn{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.crow .bar{position:relative;height:8px;border-radius:4px;background:var(--sunk);border:1px solid var(--rule);overflow:hidden}
+.crow .bar i{position:absolute;left:0;top:0;bottom:0;border-radius:3px}
+.crow .bar em{position:absolute;top:-1px;bottom:-1px;left:83.33%;width:1px;background:var(--muted);opacity:.6}
+.crow .cv{text-align:right;font-family:var(--f-mono);font-variant-numeric:tabular-nums;font-size:12px}
+.q{background:var(--quiet)} .m{background:var(--moderate)} .b{background:var(--busy)}
+.scale{display:grid;grid-template-columns:minmax(0,9.5em) 1fr 3.2em;gap:8px;font-size:10.5px;color:var(--muted)}
+.scale div{display:flex;justify-content:space-between;font-family:var(--f-mono)}
+
+.mapchips{position:absolute;top:calc(10px + 0px);right:10px;z-index:1000;display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.chip{border:1px solid var(--rule);background:var(--surface);border-radius:999px;padding:5px 11px;font-size:12px;font-weight:500;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,.12)}
+.chip[aria-pressed="true"]{background:var(--ink);color:var(--surface);border-color:var(--ink)}
+.legend{position:absolute;left:10px;bottom:10px;z-index:1000;background:color-mix(in srgb,var(--surface) 92%,transparent);border:1px solid var(--rule);border-radius:8px;padding:8px 10px;font-size:11.5px;display:flex;flex-direction:column;gap:4px;max-width:calc(100% - 20px)}
+.legend .lg{display:flex;align-items:center;gap:7px}
+.legend .ln{width:22px;height:4px;border-radius:2px;background:var(--muted);position:relative}
+.legend .ln.minor{box-shadow:0 0 0 4px color-mix(in srgb,var(--minor) 40%,transparent)}
+.legend .ln.severe{background:repeating-linear-gradient(90deg,var(--muted) 0 6px,transparent 6px 10px);box-shadow:0 0 0 4px color-mix(in srgb,var(--severe) 40%,transparent)}
+.legend .dot{width:11px;height:11px;border-radius:50%;opacity:.8}
+
+footer{font-size:11.5px;color:var(--muted);display:flex;gap:14px;flex-wrap:wrap;align-items:center}
+footer a{color:var(--muted)}
+footer label{display:flex;gap:6px;align-items:center}
+footer input{font:inherit;font-family:var(--f-mono);width:14em;padding:2px 6px;border:1px solid var(--rule);border-radius:4px;background:var(--surface);color:var(--ink)}
+
+/* Leaflet essentials (inlined) */
+.leaflet-pane,.leaflet-tile,.leaflet-marker-icon,.leaflet-marker-shadow,.leaflet-tile-container,.leaflet-pane>svg,.leaflet-pane>canvas,.leaflet-zoom-box,.leaflet-image-layer,.leaflet-layer{position:absolute;left:0;top:0}
+.leaflet-container{overflow:hidden;-webkit-tap-highlight-color:transparent;font-family:var(--f-body);outline-offset:1px}
+.leaflet-tile,.leaflet-marker-icon{user-select:none;-webkit-user-drag:none}
+.leaflet-container img.leaflet-tile{max-width:none!important;max-height:none!important;width:256px;height:256px}
+.leaflet-tile{visibility:hidden}.leaflet-tile-loaded{visibility:inherit}
+.leaflet-container .leaflet-overlay-pane svg{max-width:none!important;max-height:none!important}
+.leaflet-touch-zoom{touch-action:pan-x pan-y}.leaflet-touch-drag{touch-action:none}.leaflet-touch-drag.leaflet-touch-zoom{touch-action:none}
+.leaflet-pane{z-index:400}.leaflet-tile-pane{z-index:200}.leaflet-overlay-pane{z-index:400}.leaflet-marker-pane{z-index:600}.leaflet-tooltip-pane{z-index:650}.leaflet-popup-pane{z-index:700}
+.leaflet-zoom-animated{transform-origin:0 0}
+.leaflet-zoom-anim .leaflet-zoom-animated{transition:transform .25s cubic-bezier(0,0,.25,1)}
+.leaflet-zoom-anim .leaflet-zoom-hide{visibility:hidden}
+.leaflet-interactive{cursor:pointer}.leaflet-grab{cursor:grab}.leaflet-dragging .leaflet-grab{cursor:grabbing}
+.leaflet-pane>svg path{pointer-events:none}.leaflet-pane>svg path.leaflet-interactive{pointer-events:auto}
+.leaflet-top,.leaflet-bottom{position:absolute;z-index:1000;pointer-events:none}
+.leaflet-top{top:0}.leaflet-right{right:0}.leaflet-bottom{bottom:0}.leaflet-left{left:0}
+.leaflet-control{position:relative;z-index:800;pointer-events:auto;float:left;clear:both}
+.leaflet-right .leaflet-control{float:right}
+.leaflet-top .leaflet-control{margin-top:10px}.leaflet-bottom .leaflet-control{margin-bottom:10px}.leaflet-left .leaflet-control{margin-left:10px}.leaflet-right .leaflet-control{margin-right:10px}
+.leaflet-top.leaflet-left .leaflet-control{margin-top:10px}
+.leaflet-bar{border:1px solid var(--rule);border-radius:8px;overflow:hidden;background:var(--surface);box-shadow:0 1px 3px rgba(0,0,0,.12)}
+.leaflet-bar a{display:block;width:30px;height:30px;line-height:30px;text-align:center;text-decoration:none;color:var(--ink);font-size:17px;background:var(--surface)}
+.leaflet-bar a+a{border-top:1px solid var(--rule)}
+.leaflet-bar a:hover{background:var(--sunk)}
+.leaflet-bar a.leaflet-disabled{color:var(--muted);cursor:default}
+.leaflet-control-attribution{font-size:10.5px;padding:1px 6px;background:color-mix(in srgb,var(--surface) 80%,transparent);color:var(--muted);margin:0!important}
+.leaflet-control-attribution a{color:var(--muted)}
+.leaflet-tooltip{position:absolute;padding:5px 8px;background:var(--surface);color:var(--ink);border:1px solid var(--rule);border-radius:6px;white-space:nowrap;pointer-events:none;box-shadow:0 2px 8px rgba(0,0,0,.18);font-size:12px}
+.leaflet-tooltip b{font-weight:600}
+
+@media (max-width:820px){
+  body{overflow:auto;height:auto}
+  html{height:auto}
+  .app{grid-template-columns:1fr;flex:none}
+  .mapwrap{height:62vh;order:-1}
+  aside{overflow:visible}
+}
+@media (prefers-reduced-motion:reduce){.src.live i{animation:none}.leaflet-zoom-anim .leaflet-zoom-animated{transition:none}}
+</style>
+
+<header class="top">
+  <div class="brand">
+    <h1>London Rail Pulse</h1>
+    <span>Disruptions and crowding, Reading to Shenfield</span>
+  </div>
+  <div class="meta">
+    <span id="src" class="src"><i></i><span id="srcTxt">Connecting…</span></span>
+    <span>Updated <span id="upd" class="mono">--:--:--</span></span>
+    <button id="refresh" class="iconbtn" type="button">Refresh</button>
+  </div>
+</header>
+
+<div id="banner" class="banner" hidden>
+  <b>Showing example data.</b> The live TfL feed could not be reached from here (this preview blocks outside network calls). Hosted on GitHub Pages, the page loads live status every minute and live crowding every five.
+</div>
+
+<main class="app">
+  <aside>
+    <section class="sec" aria-label="Network summary">
+      <h2>Network now</h2>
+      <div class="tiles">
+        <div class="tile good"><b id="nGood">–</b><span>Good service</span></div>
+        <div class="tile minor"><b id="nMinor">–</b><span>Minor delays</span></div>
+        <div class="tile severe"><b id="nSevere">–</b><span>Severe / closed</span></div>
+      </div>
+    </section>
+
+    <section class="sec" aria-label="Reading corridor">
+      <h2>From Reading</h2>
+      <div class="corridor">
+        <div class="hd"><b>Reading → London</b><span>3 routes</span></div>
+        <ul class="lines" id="corridor"></ul>
+      </div>
+    </section>
+
+    <section class="sec" aria-label="All lines">
+      <h2>All lines</h2>
+      <div class="alllines"><ul class="lines" id="lines"></ul></div>
+    </section>
+
+    <section class="sec" aria-label="Station crowding">
+      <h2>Station crowding</h2>
+      <div class="crowd">
+        <p class="note" id="crowdNote">Live busyness compared with a typical day at this time. The tick marks 100%.</p>
+        <div id="crowdList"></div>
+        <div class="scale"><span></span><div><span>0%</span><span>60%</span><span>120%</span></div><span></span></div>
+      </div>
+    </section>
+  </aside>
+
+  <div class="mapwrap">
+    <div id="map" role="region" aria-label="Map of London rail lines"></div>
+    <div class="mapchips">
+      <button class="chip" id="chipFocus" type="button" aria-pressed="false">Focus disruptions</button>
+      <button class="chip" id="chipCrowd" type="button" aria-pressed="true">Crowding</button>
+      <button class="chip" id="chipFit" type="button">Reading ↔ London</button>
+    </div>
+    <div class="legend" aria-hidden="true">
+      <div class="lg"><span class="ln"></span>Good service</div>
+      <div class="lg"><span class="ln minor"></span>Minor delays</div>
+      <div class="lg"><span class="ln severe"></span>Severe, suspended or closed</div>
+      <div class="lg"><span class="dot q"></span><span class="dot m"></span><span class="dot b"></span>Crowding: quiet · moderate · busy</div>
+    </div>
+  </div>
+</main>
+
+<footer>
+  <span>Powered by TfL Open Data. Contains OS data © Crown copyright and database rights.</span>
+  <span>Route shapes: approximate until live geometry loads.</span>
+  <label for="tflKey">TfL app key (optional) <input id="tflKey" type="text" autocomplete="off" spellcheck="false" placeholder="raises rate limit"></label>
+</footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+(function(){
+"use strict";
+// ---------- Station coordinates [lat, lon] ----------
+const S={
+"Reading":[51.4587,-0.9718],"Twyford":[51.4755,-0.8633],"Maidenhead":[51.5187,-0.7226],"Taplow":[51.5236,-0.6814],"Burnham":[51.5235,-0.6464],
+"Slough":[51.5119,-0.5915],"Langley":[51.5080,-0.5418],"Iver":[51.5085,-0.5067],"West Drayton":[51.5100,-0.4721],"Hayes & Harlington":[51.5031,-0.4206],
+"Southall":[51.5059,-0.3785],"Hanwell":[51.5118,-0.3385],"West Ealing":[51.5133,-0.3200],"Ealing Broadway":[51.5148,-0.3017],"Acton Main Line":[51.5172,-0.2667],
+"Paddington":[51.5154,-0.1755],"Bond Street":[51.5142,-0.1494],"Tottenham Court Road":[51.5165,-0.1310],"Farringdon":[51.5203,-0.1053],"Liverpool Street":[51.5178,-0.0823],
+"Whitechapel":[51.5194,-0.0612],"Canary Wharf (Elizabeth)":[51.5064,-0.0168],"Custom House":[51.5096,0.0276],"Woolwich":[51.4920,0.0710],"Abbey Wood":[51.4910,0.1214],
+"Stratford":[51.5416,-0.0033],"Maryland":[51.5460,0.0058],"Forest Gate":[51.5495,0.0244],"Manor Park":[51.5524,0.0465],"Ilford":[51.5590,0.0686],"Seven Kings":[51.5640,0.0970],
+"Goodmayes":[51.5655,0.1110],"Chadwell Heath":[51.5680,0.1290],"Romford":[51.5750,0.1831],"Gidea Park":[51.5819,0.2059],"Harold Wood":[51.5928,0.2333],"Brentwood":[51.6136,0.2996],"Shenfield":[51.6308,0.3299],
+"Heathrow T2&3":[51.4713,-0.4524],"Heathrow T4":[51.4582,-0.4455],"Heathrow T5":[51.4723,-0.4900],
+"Wokingham":[51.4112,-0.8427],"Bracknell":[51.4131,-0.7516],"Ascot":[51.4062,-0.6758],"Sunningdale":[51.3920,-0.6330],"Virginia Water":[51.4018,-0.5621],"Egham":[51.4296,-0.5465],
+"Staines":[51.4325,-0.5030],"Feltham":[51.4479,-0.4098],"Twickenham":[51.4500,-0.3301],"Richmond":[51.4633,-0.3014],"Clapham Junction":[51.4643,-0.1703],"Vauxhall":[51.4861,-0.1253],"Waterloo":[51.5031,-0.1132],
+"Harrow & Wealdstone":[51.5925,-0.3351],"Wembley Central":[51.5525,-0.2964],"Stonebridge Park":[51.5441,-0.2759],"Willesden Junction":[51.5322,-0.2445],"Queen's Park":[51.5341,-0.2047],
+"Kilburn Park":[51.5351,-0.1939],"Maida Vale":[51.5298,-0.1854],"Warwick Avenue":[51.5235,-0.1835],"Edgware Road (Bakerloo)":[51.5199,-0.1679],"Marylebone":[51.5225,-0.1631],
+"Baker Street":[51.5226,-0.1571],"Regent's Park":[51.5234,-0.1466],"Oxford Circus":[51.5152,-0.1415],"Piccadilly Circus":[51.5098,-0.1342],"Charing Cross":[51.5080,-0.1247],
+"Embankment":[51.5074,-0.1223],"Lambeth North":[51.4991,-0.1115],"Elephant & Castle":[51.4943,-0.1001],
+"West Ruislip":[51.5697,-0.4378],"Ruislip Gardens":[51.5606,-0.4103],"South Ruislip":[51.5569,-0.3988],"Northolt":[51.5483,-0.3687],"Greenford":[51.5423,-0.3456],"Perivale":[51.5366,-0.3232],
+"Hanger Lane":[51.5302,-0.2933],"North Acton":[51.5237,-0.2597],"West Acton":[51.5180,-0.2810],"East Acton":[51.5168,-0.2474],"White City":[51.5120,-0.2240],"Shepherd's Bush":[51.5046,-0.2187],
+"Holland Park":[51.5075,-0.2060],"Notting Hill Gate":[51.5094,-0.1967],"Queensway":[51.5107,-0.1877],"Lancaster Gate":[51.5119,-0.1756],"Marble Arch":[51.5136,-0.1586],
+"Holborn":[51.5174,-0.1201],"Chancery Lane":[51.5185,-0.1111],"St Paul's":[51.5146,-0.0973],"Bank":[51.5133,-0.0886],"Bethnal Green":[51.5270,-0.0549],"Mile End":[51.5249,-0.0332],
+"Leyton":[51.5566,-0.0053],"Leytonstone":[51.5683,0.0083],"Snaresbrook":[51.5808,0.0216],"South Woodford":[51.5917,0.0275],"Woodford":[51.6070,0.0341],"Buckhurst Hill":[51.6265,0.0471],
+"Loughton":[51.6412,0.0558],"Debden":[51.6455,0.0838],"Theydon Bois":[51.6717,0.1033],"Epping":[51.6937,0.1139],
+"Wanstead":[51.5775,0.0288],"Redbridge":[51.5763,0.0454],"Gants Hill":[51.5765,0.0663],"Newbury Park":[51.5756,0.0900],"Barkingside":[51.5856,0.0887],"Fairlop":[51.5960,0.0912],
+"Hainault":[51.6030,0.0933],"Grange Hill":[51.6131,0.0923],"Chigwell":[51.6177,0.0756],"Roding Valley":[51.6171,0.0439],
+"Hammersmith (H&C)":[51.4936,-0.2251],"Goldhawk Road":[51.5018,-0.2267],"Shepherd's Bush Market":[51.5058,-0.2265],"Wood Lane":[51.5098,-0.2242],"Latimer Road":[51.5139,-0.2172],
+"Ladbroke Grove":[51.5172,-0.2107],"Westbourne Park":[51.5210,-0.2011],"Royal Oak":[51.5190,-0.1880],"Edgware Road":[51.5203,-0.1677],"Great Portland Street":[51.5238,-0.1439],
+"Euston Square":[51.5258,-0.1359],"King's Cross St Pancras":[51.5308,-0.1238],"Barbican":[51.5204,-0.0979],"Moorgate":[51.5186,-0.0886],"Aldgate":[51.5143,-0.0755],
+"Tower Hill":[51.5098,-0.0766],"Monument":[51.5108,-0.0863],"Cannon Street":[51.5113,-0.0904],"Mansion House":[51.5122,-0.0940],"Blackfriars":[51.5120,-0.1031],"Temple":[51.5111,-0.1141],
+"Westminster":[51.5010,-0.1254],"St James's Park":[51.4994,-0.1335],"Victoria":[51.4965,-0.1447],"Sloane Square":[51.4924,-0.1565],"South Kensington":[51.4941,-0.1738],
+"Gloucester Road":[51.4945,-0.1829],"High Street Kensington":[51.5009,-0.1925],"Bayswater":[51.5122,-0.1879],
+"Aldgate East":[51.5154,-0.0726],"Stepney Green":[51.5221,-0.0465],"Bow Road":[51.5269,-0.0247],"Bromley-by-Bow":[51.5248,-0.0119],"West Ham":[51.5287,0.0056],"Plaistow":[51.5313,0.0172],
+"Upton Park":[51.5352,0.0343],"East Ham":[51.5394,0.0518],"Barking":[51.5396,0.0809],"Upney":[51.5385,0.1014],"Becontree":[51.5403,0.1270],"Dagenham Heathway":[51.5417,0.1469],
+"Dagenham East":[51.5443,0.1655],"Elm Park":[51.5496,0.1977],"Hornchurch":[51.5539,0.2184],"Upminster Bridge":[51.5582,0.2343],"Upminster":[51.5590,0.2510],
+"Kew Gardens":[51.4770,-0.2850],"Gunnersbury":[51.4917,-0.2754],"Turnham Green":[51.4951,-0.2547],"Ealing Common":[51.5101,-0.2882],"Acton Town":[51.5028,-0.2801],"Chiswick Park":[51.4946,-0.2678],
+"Stamford Brook":[51.4950,-0.2459],"Ravenscourt Park":[51.4942,-0.2359],"Hammersmith":[51.4927,-0.2240],"Barons Court":[51.4905,-0.2139],"West Kensington":[51.4907,-0.2065],"Earl's Court":[51.4920,-0.1934],
+"West Brompton":[51.4872,-0.1953],"Fulham Broadway":[51.4802,-0.1953],"Parsons Green":[51.4753,-0.2011],"Putney Bridge":[51.4682,-0.2089],"East Putney":[51.4590,-0.2110],"Southfields":[51.4454,-0.2066],
+"Wimbledon Park":[51.4343,-0.1992],"Wimbledon":[51.4214,-0.2064],"Kensington (Olympia)":[51.4977,-0.2100],
+"Stanmore":[51.6194,-0.3028],"Canons Park":[51.6078,-0.2947],"Queensbury":[51.5942,-0.2861],"Kingsbury":[51.5846,-0.2786],"Wembley Park":[51.5635,-0.2795],"Neasden":[51.5542,-0.2503],
+"Dollis Hill":[51.5521,-0.2386],"Willesden Green":[51.5492,-0.2215],"Kilburn":[51.5471,-0.2047],"West Hampstead":[51.5469,-0.1906],"Finchley Road":[51.5472,-0.1803],"Swiss Cottage":[51.5432,-0.1748],
+"St John's Wood":[51.5347,-0.1740],"Green Park":[51.5067,-0.1428],"Southwark":[51.5039,-0.1052],"London Bridge":[51.5052,-0.0864],"Bermondsey":[51.4979,-0.0637],"Canada Water":[51.4982,-0.0502],
+"Canary Wharf":[51.5036,-0.0195],"North Greenwich":[51.5005,0.0039],"Canning Town":[51.5147,0.0082],
+"Amersham":[51.6741,-0.6075],"Chesham":[51.7052,-0.6110],"Chalfont & Latimer":[51.6680,-0.5610],"Chorleywood":[51.6543,-0.5183],"Rickmansworth":[51.6403,-0.4733],"Moor Park":[51.6301,-0.4321],
+"Watford":[51.6576,-0.4174],"Croxley":[51.6470,-0.4413],"Northwood":[51.6111,-0.4239],"Northwood Hills":[51.6004,-0.4092],"Pinner":[51.5930,-0.3815],"North Harrow":[51.5847,-0.3626],
+"Harrow-on-the-Hill":[51.5793,-0.3366],"Northwick Park":[51.5784,-0.3184],"Preston Road":[51.5721,-0.2954],"Uxbridge":[51.5463,-0.4786],"Hillingdon":[51.5538,-0.4499],"Ickenham":[51.5619,-0.4421],
+"Ruislip":[51.5715,-0.4213],"Ruislip Manor":[51.5732,-0.4125],"Eastcote":[51.5765,-0.3970],"Rayners Lane":[51.5753,-0.3714],"West Harrow":[51.5795,-0.3533],
+"Edgware":[51.6137,-0.2750],"Burnt Oak":[51.6026,-0.2641],"Colindale":[51.5954,-0.2502],"Hendon Central":[51.5830,-0.2265],"Brent Cross":[51.5766,-0.2136],"Golders Green":[51.5724,-0.1941],
+"Hampstead":[51.5568,-0.1780],"Belsize Park":[51.5504,-0.1642],"Chalk Farm":[51.5441,-0.1538],"Camden Town":[51.5392,-0.1426],"Mornington Crescent":[51.5343,-0.1387],"Euston":[51.5282,-0.1337],
+"Warren Street":[51.5247,-0.1384],"Goodge Street":[51.5205,-0.1347],"Leicester Square":[51.5113,-0.1281],"Kennington":[51.4884,-0.1053],"Oval":[51.4819,-0.1127],"Stockwell":[51.4723,-0.1229],
+"Clapham North":[51.4650,-0.1300],"Clapham Common":[51.4618,-0.1384],"Clapham South":[51.4527,-0.1480],"Balham":[51.4431,-0.1525],"Tooting Bec":[51.4359,-0.1597],"Tooting Broadway":[51.4275,-0.1680],
+"Colliers Wood":[51.4180,-0.1778],"South Wimbledon":[51.4154,-0.1919],"Morden":[51.4022,-0.1948],"High Barnet":[51.6505,-0.1940],"Totteridge & Whetstone":[51.6302,-0.1791],"Woodside Park":[51.6179,-0.1856],
+"West Finchley":[51.6095,-0.1883],"Mill Hill East":[51.6082,-0.2103],"Finchley Central":[51.6012,-0.1932],"East Finchley":[51.5874,-0.1650],"Highgate":[51.5777,-0.1458],"Archway":[51.5653,-0.1353],
+"Tufnell Park":[51.5567,-0.1374],"Kentish Town":[51.5507,-0.1403],"Angel":[51.5322,-0.1058],"Old Street":[51.5263,-0.0873],"Borough":[51.5011,-0.0943],"Nine Elms":[51.4799,-0.1286],"Battersea Power Station":[51.4793,-0.1420],
+"Hatton Cross":[51.4669,-0.4227],"Hounslow West":[51.4734,-0.3856],"Hounslow Central":[51.4713,-0.3665],"Hounslow East":[51.4733,-0.3564],"Osterley":[51.4813,-0.3522],"Boston Manor":[51.4956,-0.3250],
+"Northfields":[51.4995,-0.3142],"South Ealing":[51.5011,-0.3072],"Knightsbridge":[51.5015,-0.1607],"Hyde Park Corner":[51.5027,-0.1527],"Covent Garden":[51.5129,-0.1243],"Russell Square":[51.5230,-0.1244],
+"Caledonian Road":[51.5481,-0.1188],"Holloway Road":[51.5526,-0.1132],"Arsenal":[51.5586,-0.1059],"Finsbury Park":[51.5642,-0.1065],"Manor House":[51.5712,-0.0958],"Turnpike Lane":[51.5904,-0.1028],
+"Wood Green":[51.5975,-0.1097],"Bounds Green":[51.6071,-0.1243],"Arnos Grove":[51.6164,-0.1331],"Southgate":[51.6322,-0.1280],"Oakwood":[51.6476,-0.1318],"Cockfosters":[51.6517,-0.1496],
+"North Ealing":[51.5175,-0.2887],"Park Royal":[51.5270,-0.2841],"Alperton":[51.5407,-0.2997],"Sudbury Town":[51.5507,-0.3156],"Sudbury Hill":[51.5569,-0.3366],"South Harrow":[51.5647,-0.3521],
+"Walthamstow Central":[51.5830,-0.0195],"Blackhorse Road":[51.5866,-0.0412],"Tottenham Hale":[51.5882,-0.0594],"Seven Sisters":[51.5822,-0.0749],"Highbury & Islington":[51.5460,-0.1040],"Pimlico":[51.4893,-0.1334],"Brixton":[51.4627,-0.1145],
+"Tower Gateway":[51.5106,-0.0743],"Shadwell":[51.5117,-0.0570],"Limehouse":[51.5123,-0.0396],"Westferry":[51.5097,-0.0265],"West India Quay":[51.5070,-0.0203],"Canary Wharf DLR":[51.5050,-0.0209],
+"South Quay":[51.5007,-0.0191],"Crossharbour":[51.4957,-0.0144],"Mudchute":[51.4907,-0.0147],"Island Gardens":[51.4878,-0.0102],"Cutty Sark":[51.4820,-0.0096],"Greenwich":[51.4781,-0.0149],
+"Deptford Bridge":[51.4740,-0.0216],"Lewisham":[51.4651,-0.0141],"Pudding Mill Lane":[51.5343,-0.0139],"Bow Church":[51.5273,-0.0208],"Devons Road":[51.5222,-0.0177],"Langdon Park":[51.5151,-0.0139],
+"All Saints":[51.5107,-0.0130],"Poplar":[51.5077,-0.0173],"Blackwall":[51.5079,-0.0066],"East India":[51.5093,-0.0020],"Royal Victoria":[51.5091,0.0181],"Prince Regent":[51.5093,0.0336],
+"Royal Albert":[51.5084,0.0465],"Beckton Park":[51.5087,0.0550],"Cyprus":[51.5084,0.0640],"Gallions Reach":[51.5089,0.0716],"Beckton":[51.5143,0.0615],"West Silvertown":[51.5028,0.0222],
+"Pontoon Dock":[51.5022,0.0322],"London City Airport":[51.5036,0.0487],"King George V":[51.5020,0.0628],"Woolwich Arsenal":[51.4900,0.0691],"Stratford International":[51.5455,-0.0091],
+"Stratford High Street":[51.5380,0.0004],"Abbey Road":[51.5319,0.0037],"Star Lane":[51.5208,0.0042],
+"Emerson Park":[51.5686,0.2201],"South Hampstead":[51.5414,-0.1789],"Kilburn High Road":[51.5373,-0.1923],"Kensal Green":[51.5306,-0.2250],"Harlesden":[51.5363,-0.2577],"North Wembley":[51.5626,-0.3039],
+"South Kenton":[51.5701,-0.3081],"Kenton":[51.5816,-0.3170],"Headstone Lane":[51.6026,-0.3571],"Hatch End":[51.6094,-0.3685],"Carpenders Park":[51.6283,-0.3858],"Bushey":[51.6457,-0.3852],
+"Watford High Street":[51.6527,-0.3917],"Watford Junction":[51.6635,-0.3961],"South Acton":[51.4997,-0.2700],"Acton Central":[51.5087,-0.2630],"Kensal Rise":[51.5345,-0.2195],
+"Brondesbury Park":[51.5404,-0.2101],"Brondesbury":[51.5452,-0.2025],"Finchley Road & Frognal":[51.5501,-0.1834],"Hampstead Heath":[51.5555,-0.1655],"Gospel Oak":[51.5554,-0.1511],
+"Kentish Town West":[51.5465,-0.1467],"Camden Road":[51.5419,-0.1387],"Caledonian Road & Barnsbury":[51.5432,-0.1166],"Canonbury":[51.5486,-0.0921],"Dalston Kingsland":[51.5481,-0.0757],
+"Hackney Central":[51.5470,-0.0563],"Homerton":[51.5470,-0.0423],"Hackney Wick":[51.5434,-0.0247],"Imperial Wharf":[51.4749,-0.1828],
+"Upper Holloway":[51.5636,-0.1294],"Crouch Hill":[51.5713,-0.1170],"Harringay Green Lanes":[51.5773,-0.0981],"South Tottenham":[51.5804,-0.0720],"Walthamstow Queen's Road":[51.5815,-0.0238],
+"Leyton Midland Road":[51.5697,-0.0080],"Leytonstone High Road":[51.5636,0.0083],"Wanstead Park":[51.5517,0.0262],"Woodgrange Park":[51.5492,0.0444],"Barking Riverside":[51.5190,0.1155],
+"Bethnal Green (Overground)":[51.5240,-0.0595],"Cambridge Heath":[51.5320,-0.0570],"London Fields":[51.5410,-0.0577],"Hackney Downs":[51.5486,-0.0605],"Rectory Road":[51.5585,-0.0682],
+"Stoke Newington":[51.5652,-0.0729],"Stamford Hill":[51.5745,-0.0767],"Bruce Grove":[51.5937,-0.0697],"White Hart Lane":[51.6050,-0.0709],"Silver Street":[51.6146,-0.0673],"Edmonton Green":[51.6248,-0.0611],
+"Bush Hill Park":[51.6415,-0.0692],"Enfield Town":[51.6520,-0.0793],"Southbury":[51.6487,-0.0526],"Turkey Street":[51.6726,-0.0472],"Theobalds Grove":[51.6925,-0.0349],"Cheshunt":[51.7029,-0.0240],
+"Clapton":[51.5616,-0.0570],"St James Street":[51.5810,-0.0329],"Wood Street":[51.5865,-0.0024],"Highams Park":[51.6084,-0.0003],"Chingford":[51.6331,0.0099],
+"Dalston Junction":[51.5461,-0.0753],"Haggerston":[51.5387,-0.0757],"Hoxton":[51.5315,-0.0757],"Shoreditch High Street":[51.5233,-0.0751],"Wapping":[51.5043,-0.0559],"Rotherhithe":[51.5010,-0.0520],
+"Surrey Quays":[51.4933,-0.0475],"New Cross Gate":[51.4755,-0.0402],"New Cross":[51.4763,-0.0327],"Brockley":[51.4646,-0.0375],"Honor Oak Park":[51.4500,-0.0454],"Forest Hill":[51.4392,-0.0531],
+"Sydenham":[51.4272,-0.0542],"Crystal Palace":[51.4182,-0.0726],"Penge West":[51.4175,-0.0608],"Anerley":[51.4125,-0.0650],"Norwood Junction":[51.3970,-0.0752],"West Croydon":[51.3784,-0.1025],
+"Queens Road Peckham":[51.4735,-0.0571],"Peckham Rye":[51.4700,-0.0694],"Denmark Hill":[51.4682,-0.0892],"Clapham High Street":[51.4654,-0.1324],"Wandsworth Road":[51.4702,-0.1385],
+"Mitcham":[51.4033,-0.1665],"Therapia Lane":[51.3854,-0.1270],"Wandle Park":[51.3739,-0.1137],"East Croydon":[51.3754,-0.0920],"Sandilands":[51.3750,-0.0780],"Lloyd Park":[51.3642,-0.0807],
+"New Addington":[51.3426,-0.0164],"Arena":[51.3913,-0.0587],"Beckenham Junction":[51.4110,-0.0262],"Elmers End":[51.3984,-0.0494]
+};
+
+// ---------- Lines (station sequences, simplified) ----------
+const MODE={tube:"Underground","elizabeth-line":"Elizabeth line",dlr:"DLR",overground:"Overground",tram:"Tram","national-rail":"National Rail"};
+const LINES=[
+{id:"elizabeth",name:"Elizabeth line",mode:"elizabeth-line",color:"#6950A1",segs:[
+ ["Reading","Twyford","Maidenhead","Taplow","Burnham","Slough","Langley","Iver","West Drayton","Hayes & Harlington","Southall","Hanwell","West Ealing","Ealing Broadway","Acton Main Line","Paddington","Bond Street","Tottenham Court Road","Farringdon","Liverpool Street","Whitechapel","Stratford","Maryland","Forest Gate","Manor Park","Ilford","Seven Kings","Goodmayes","Chadwell Heath","Romford","Gidea Park","Harold Wood","Brentwood","Shenfield"],
+ ["Whitechapel","Canary Wharf (Elizabeth)","Custom House","Woolwich","Abbey Wood"],
+ ["Hayes & Harlington","Heathrow T2&3","Heathrow T5"],["Heathrow T2&3","Heathrow T4"]]},
+{id:"great-western-railway",name:"Great Western Railway",mode:"national-rail",color:"#0A493E",dark:"#2f9b7f",segs:[
+ ["Reading","Twyford","Maidenhead","Slough","Hayes & Harlington","Southall","Ealing Broadway","Paddington"]]},
+{id:"south-western-railway",name:"South Western Railway",mode:"national-rail",color:"#24398C",dark:"#5b76d6",segs:[
+ ["Reading","Wokingham","Bracknell","Ascot","Sunningdale","Virginia Water","Egham","Staines","Feltham","Twickenham","Richmond","Clapham Junction","Vauxhall","Waterloo"]]},
+{id:"bakerloo",name:"Bakerloo",mode:"tube",color:"#B36305",segs:[
+ ["Harrow & Wealdstone","Wembley Central","Stonebridge Park","Willesden Junction","Queen's Park","Kilburn Park","Maida Vale","Warwick Avenue","Paddington","Edgware Road (Bakerloo)","Marylebone","Baker Street","Regent's Park","Oxford Circus","Piccadilly Circus","Charing Cross","Embankment","Waterloo","Lambeth North","Elephant & Castle"]]},
+{id:"central",name:"Central",mode:"tube",color:"#E32017",segs:[
+ ["West Ruislip","Ruislip Gardens","South Ruislip","Northolt","Greenford","Perivale","Hanger Lane","North Acton","East Acton","White City","Shepherd's Bush","Holland Park","Notting Hill Gate","Queensway","Lancaster Gate","Marble Arch","Bond Street","Oxford Circus","Tottenham Court Road","Holborn","Chancery Lane","St Paul's","Bank","Liverpool Street","Bethnal Green","Mile End","Stratford","Leyton","Leytonstone","Snaresbrook","South Woodford","Woodford","Buckhurst Hill","Loughton","Debden","Theydon Bois","Epping"],
+ ["North Acton","West Acton","Ealing Broadway"],
+ ["Leytonstone","Wanstead","Redbridge","Gants Hill","Newbury Park","Barkingside","Fairlop","Hainault","Grange Hill","Chigwell","Roding Valley","Woodford"]]},
+{id:"circle",name:"Circle",mode:"tube",color:"#FFD300",dark:"#FFD300",segs:[
+ ["Hammersmith (H&C)","Goldhawk Road","Shepherd's Bush Market","Wood Lane","Latimer Road","Ladbroke Grove","Westbourne Park","Royal Oak","Paddington","Edgware Road","Baker Street","Great Portland Street","Euston Square","King's Cross St Pancras","Farringdon","Barbican","Moorgate","Liverpool Street","Aldgate","Tower Hill","Monument","Cannon Street","Mansion House","Blackfriars","Temple","Embankment","Westminster","St James's Park","Victoria","Sloane Square","South Kensington","Gloucester Road","High Street Kensington","Notting Hill Gate","Bayswater","Paddington","Edgware Road"]]},
+{id:"district",name:"District",mode:"tube",color:"#00782A",dark:"#1f9d4b",segs:[
+ ["Richmond","Kew Gardens","Gunnersbury","Turnham Green","Stamford Brook","Ravenscourt Park","Hammersmith","Barons Court","West Kensington","Earl's Court","Gloucester Road","South Kensington","Sloane Square","Victoria","St James's Park","Westminster","Embankment","Temple","Blackfriars","Mansion House","Cannon Street","Monument","Tower Hill","Aldgate East","Whitechapel","Stepney Green","Mile End","Bow Road","Bromley-by-Bow","West Ham","Plaistow","Upton Park","East Ham","Barking","Upney","Becontree","Dagenham Heathway","Dagenham East","Elm Park","Hornchurch","Upminster Bridge","Upminster"],
+ ["Ealing Broadway","Ealing Common","Acton Town","Chiswick Park","Turnham Green"],
+ ["Earl's Court","West Brompton","Fulham Broadway","Parsons Green","Putney Bridge","East Putney","Southfields","Wimbledon Park","Wimbledon"],
+ ["Earl's Court","High Street Kensington","Notting Hill Gate","Bayswater","Paddington","Edgware Road"],
+ ["Earl's Court","Kensington (Olympia)"]]},
+{id:"hammersmith-city",name:"Hammersmith & City",mode:"tube",color:"#F3A9BB",segs:[
+ ["Hammersmith (H&C)","Goldhawk Road","Shepherd's Bush Market","Wood Lane","Latimer Road","Ladbroke Grove","Westbourne Park","Royal Oak","Paddington","Edgware Road","Baker Street","Great Portland Street","Euston Square","King's Cross St Pancras","Farringdon","Barbican","Moorgate","Liverpool Street","Aldgate East","Whitechapel","Stepney Green","Mile End","Bow Road","Bromley-by-Bow","West Ham","Plaistow","Upton Park","East Ham","Barking"]]},
+{id:"jubilee",name:"Jubilee",mode:"tube",color:"#A0A5A9",segs:[
+ ["Stanmore","Canons Park","Queensbury","Kingsbury","Wembley Park","Neasden","Dollis Hill","Willesden Green","Kilburn","West Hampstead","Finchley Road","Swiss Cottage","St John's Wood","Baker Street","Bond Street","Green Park","Westminster","Waterloo","Southwark","London Bridge","Bermondsey","Canada Water","Canary Wharf","North Greenwich","Canning Town","West Ham","Stratford"]]},
+{id:"metropolitan",name:"Metropolitan",mode:"tube",color:"#9B0056",dark:"#c43a85",segs:[
+ ["Amersham","Chalfont & Latimer","Chorleywood","Rickmansworth","Moor Park","Northwood","Northwood Hills","Pinner","North Harrow","Harrow-on-the-Hill","Northwick Park","Preston Road","Wembley Park","Finchley Road","Baker Street","Great Portland Street","Euston Square","King's Cross St Pancras","Farringdon","Barbican","Moorgate","Liverpool Street","Aldgate"],
+ ["Chesham","Chalfont & Latimer"],["Watford","Croxley","Moor Park"],
+ ["Uxbridge","Hillingdon","Ickenham","Ruislip","Ruislip Manor","Eastcote","Rayners Lane","West Harrow","Harrow-on-the-Hill"]]},
+{id:"northern",name:"Northern",mode:"tube",color:"#1a1a1a",dark:"#cfd6de",segs:[
+ ["Edgware","Burnt Oak","Colindale","Hendon Central","Brent Cross","Golders Green","Hampstead","Belsize Park","Chalk Farm","Camden Town","Mornington Crescent","Euston","Warren Street","Goodge Street","Tottenham Court Road","Leicester Square","Charing Cross","Embankment","Waterloo","Kennington","Oval","Stockwell","Clapham North","Clapham Common","Clapham South","Balham","Tooting Bec","Tooting Broadway","Colliers Wood","South Wimbledon","Morden"],
+ ["High Barnet","Totteridge & Whetstone","Woodside Park","West Finchley","Finchley Central","East Finchley","Highgate","Archway","Tufnell Park","Kentish Town","Camden Town"],
+ ["Finchley Central","Mill Hill East"],
+ ["Camden Town","Euston","King's Cross St Pancras","Angel","Old Street","Moorgate","Bank","London Bridge","Borough","Elephant & Castle","Kennington"],
+ ["Kennington","Nine Elms","Battersea Power Station"]]},
+{id:"piccadilly",name:"Piccadilly",mode:"tube",color:"#003688",dark:"#4a74d9",segs:[
+ ["Heathrow T5","Heathrow T2&3","Hatton Cross","Hounslow West","Hounslow Central","Hounslow East","Osterley","Boston Manor","Northfields","South Ealing","Acton Town","Turnham Green","Hammersmith","Barons Court","Earl's Court","Gloucester Road","South Kensington","Knightsbridge","Hyde Park Corner","Green Park","Piccadilly Circus","Leicester Square","Covent Garden","Holborn","Russell Square","King's Cross St Pancras","Caledonian Road","Holloway Road","Arsenal","Finsbury Park","Manor House","Turnpike Lane","Wood Green","Bounds Green","Arnos Grove","Southgate","Oakwood","Cockfosters"],
+ ["Hatton Cross","Heathrow T4","Heathrow T2&3"],
+ ["Acton Town","Ealing Common","North Ealing","Park Royal","Alperton","Sudbury Town","Sudbury Hill","South Harrow","Rayners Lane","Eastcote","Ruislip Manor","Ruislip","Ickenham","Hillingdon","Uxbridge"]]},
+{id:"victoria",name:"Victoria",mode:"tube",color:"#0098D4",segs:[
+ ["Walthamstow Central","Blackhorse Road","Tottenham Hale","Seven Sisters","Finsbury Park","Highbury & Islington","King's Cross St Pancras","Euston","Warren Street","Oxford Circus","Green Park","Victoria","Pimlico","Vauxhall","Stockwell","Brixton"]]},
+{id:"waterloo-city",name:"Waterloo & City",mode:"tube",color:"#95CDBA",segs:[["Waterloo","Bank"]]},
+{id:"dlr",name:"DLR",mode:"dlr",color:"#00A4A7",segs:[
+ ["Bank","Shadwell","Limehouse","Westferry","West India Quay","Canary Wharf DLR","South Quay","Crossharbour","Mudchute","Island Gardens","Cutty Sark","Greenwich","Deptford Bridge","Lewisham"],
+ ["Tower Gateway","Shadwell"],
+ ["Stratford","Pudding Mill Lane","Bow Church","Devons Road","Langdon Park","All Saints","Poplar","West India Quay"],
+ ["Poplar","Blackwall","East India","Canning Town","Royal Victoria","Custom House","Prince Regent","Royal Albert","Beckton Park","Cyprus","Gallions Reach","Beckton"],
+ ["Canning Town","West Silvertown","Pontoon Dock","London City Airport","King George V","Woolwich Arsenal"],
+ ["Stratford International","Stratford","Stratford High Street","Abbey Road","West Ham","Star Lane","Canning Town"]]},
+{id:"liberty",name:"Liberty",mode:"overground",color:"#61686B",dark:"#9aa3a7",segs:[["Romford","Emerson Park","Upminster"]]},
+{id:"lioness",name:"Lioness",mode:"overground",color:"#F1B41C",segs:[
+ ["Euston","South Hampstead","Kilburn High Road","Queen's Park","Kensal Green","Willesden Junction","Harlesden","Stonebridge Park","Wembley Central","North Wembley","South Kenton","Kenton","Harrow & Wealdstone","Headstone Lane","Hatch End","Carpenders Park","Bushey","Watford High Street","Watford Junction"]]},
+{id:"mildmay",name:"Mildmay",mode:"overground",color:"#437EC1",segs:[
+ ["Richmond","Kew Gardens","Gunnersbury","South Acton","Acton Central","Willesden Junction","Kensal Rise","Brondesbury Park","Brondesbury","West Hampstead","Finchley Road & Frognal","Hampstead Heath","Gospel Oak","Kentish Town West","Camden Road","Caledonian Road & Barnsbury","Highbury & Islington","Canonbury","Dalston Kingsland","Hackney Central","Homerton","Hackney Wick","Stratford"],
+ ["Willesden Junction","Shepherd's Bush","Kensington (Olympia)","West Brompton","Imperial Wharf","Clapham Junction"]]},
+{id:"suffragette",name:"Suffragette",mode:"overground",color:"#39B97A",segs:[
+ ["Gospel Oak","Upper Holloway","Crouch Hill","Harringay Green Lanes","South Tottenham","Blackhorse Road","Walthamstow Queen's Road","Leyton Midland Road","Leytonstone High Road","Wanstead Park","Woodgrange Park","Barking","Barking Riverside"]]},
+{id:"weaver",name:"Weaver",mode:"overground",color:"#972861",dark:"#c45591",segs:[
+ ["Liverpool Street","Bethnal Green (Overground)","Cambridge Heath","London Fields","Hackney Downs","Rectory Road","Stoke Newington","Stamford Hill","Seven Sisters","Bruce Grove","White Hart Lane","Silver Street","Edmonton Green","Bush Hill Park","Enfield Town"],
+ ["Edmonton Green","Southbury","Turkey Street","Theobalds Grove","Cheshunt"],
+ ["Hackney Downs","Clapton","St James Street","Walthamstow Central","Wood Street","Highams Park","Chingford"]]},
+{id:"windrush",name:"Windrush",mode:"overground",color:"#EF4D5E",segs:[
+ ["Highbury & Islington","Canonbury","Dalston Junction","Haggerston","Hoxton","Shoreditch High Street","Whitechapel","Shadwell","Wapping","Rotherhithe","Canada Water","Surrey Quays","New Cross Gate","Brockley","Honor Oak Park","Forest Hill","Sydenham","Penge West","Anerley","Norwood Junction","West Croydon"],
+ ["Sydenham","Crystal Palace"],["Surrey Quays","New Cross"],
+ ["Surrey Quays","Queens Road Peckham","Peckham Rye","Denmark Hill","Clapham High Street","Wandsworth Road","Clapham Junction"]]},
+{id:"tram",name:"Tram",mode:"tram",color:"#5FB526",segs:[
+ ["Wimbledon","Mitcham","Therapia Lane","Wandle Park","West Croydon","East Croydon","Sandilands","Lloyd Park","New Addington"],
+ ["Sandilands","Arena","Beckenham Junction"],["Arena","Elmers End"]]}
+];
+const CORRIDOR=["elizabeth","great-western-railway","south-western-railway"];
+
+// ---------- Crowding stations (TfL NaPTAN ids) ----------
+const CROWD=[
+["940GZZLUOXC","Oxford Circus"],["940GZZLUBNK","Bank"],["940GZZLUKSX","King's Cross St Pancras"],["940GZZLUWLO","Waterloo"],
+["940GZZLUVIC","Victoria"],["940GZZLULNB","London Bridge"],["940GZZLULVT","Liverpool Street"],["940GZZLUPAC","Paddington"],
+["940GZZLUSTD","Stratford"],["940GZZLUCYF","Canary Wharf"],["940GZZLUBND","Bond Street"],["940GZZLUTCR","Tottenham Court Road"],
+["940GZZLUGPK","Green Park"],["940GZZLUEUS","Euston"],["940GZZLUBST","Baker Street"],["940GZZLULSQ","Leicester Square"],
+["940GZZLUHBN","Holborn"],["940GZZLUWSM","Westminster"],["940GZZLUBXN","Brixton"],["940GZZLUCTN","Camden Town"],
+["940GZZLUECT","Earl's Court"],["940GZZLUHSD","Hammersmith"],["940GZZLUEBY","Ealing Broadway"],["940GZZLUWIM","Wimbledon"]
+];
+
+// ---------- Example snapshot (used only when the live API is unreachable) ----------
+const EXAMPLE_STATUS={
+ "central":[{s:9,d:"Minor Delays",r:"EXAMPLE: Central line: Minor delays between White City and Liverpool Street while we fix a signal failure at Holland Park."}],
+ "elizabeth":[{s:3,d:"Part Suspended",r:"EXAMPLE: Elizabeth line: No service between Maidenhead and Reading due to a points failure. Use GWR tickets on local buses."}],
+ "great-western-railway":[{s:9,d:"Minor Delays",r:"EXAMPLE: Trains between Reading and London Paddington may be delayed by up to 15 minutes."}],
+ "northern":[{s:9,d:"Minor Delays",r:"EXAMPLE: Northern line: Minor delays on the Bank branch due to train cancellations."}],
+ "weaver":[{s:5,d:"Part Closure",r:"EXAMPLE: Weaver line: No service between Hackney Downs and Chingford due to planned engineering work."}]
+};
+const EXAMPLE_CROWD={"Oxford Circus":.92,"Bank":.71,"King's Cross St Pancras":.84,"Waterloo":.78,"Victoria":.88,"London Bridge":.66,"Liverpool Street":.81,"Paddington":.74,"Stratford":.69,"Canary Wharf":.52,"Bond Street":.95,"Tottenham Court Road":.86,"Green Park":.63,"Euston":.58,"Baker Street":.61,"Leicester Square":.77,"Holborn":.55,"Westminster":.48,"Brixton":.72,"Camden Town":.83,"Earl's Court":.44,"Hammersmith":.51,"Ealing Broadway":.39,"Wimbledon":.36};
+
+// ---------- Helpers ----------
+const $=id=>document.getElementById(id);
+const esc=s=>String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+const store={get(k){try{return localStorage.getItem(k)}catch(e){return null}},set(k,v){try{localStorage.setItem(k,v)}catch(e){}}};
+const API="https://api.tfl.gov.uk";
+function apiUrl(p){const k=(store.get("tflKey")||"").trim();return API+p+(k?(p.includes("?")?"&":"?")+"app_key="+encodeURIComponent(k):"")}
+async function getJSON(p){const c=new AbortController();const t=setTimeout(()=>c.abort(),9000);
+  try{const r=await fetch(apiUrl(p),{signal:c.signal});if(!r.ok)throw new Error("HTTP "+r.status);return await r.json()}finally{clearTimeout(t)}}
+// Serial request queue keeps us inside TfL's anonymous rate limit.
+const Q=[];let qBusy=false;
+function enqueue(fn,first){return new Promise((res,rej)=>{(first?Q.unshift.bind(Q):Q.push.bind(Q))({fn,res,rej});pump()})}
+async function pump(){if(qBusy)return;qBusy=true;while(Q.length){const j=Q.shift();try{j.res(await j.fn())}catch(e){j.rej(e)}await sleep(1300)}qBusy=false}
+
+function classify(sev){if([10,18,19].includes(sev))return"good";if(sev===20)return"closed";if([0,7,8,9,12,13,14,15,17].includes(sev))return"minor";return"severe"}
+const RANK={unknown:0,good:1,closed:2,minor:3,severe:4};
+function isDark(){const t=document.documentElement.getAttribute("data-theme");if(t)return t==="dark";return matchMedia("(prefers-color-scheme: dark)").matches}
+function tok(n){return getComputedStyle(document.documentElement).getPropertyValue(n).trim()}
+const byId={};LINES.forEach(l=>byId[l.id]=l);
+function lineColor(id){const l=byId[id];return isDark()&&l.dark?l.dark:l.color}
+function semColor(c){return tok({good:"--good",minor:"--minor",severe:"--severe",closed:"--closed"}[c]||"--closed")}
+function crowdBand(p){return p<.5?"q":p<.8?"m":"b"}
+function crowdColor(p){return tok({q:"--quiet",m:"--moderate",b:"--busy"}[crowdBand(p)])}
+function hhmmss(d){return d.toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit",second:"2-digit"})}
+
+// ---------- State ----------
+const state={status:{},crowd:{},mode:"connecting",selected:null,hover:null,focus:false,showCrowd:true};
+
+// ---------- Map ----------
+const map=L.map("map",{zoomControl:true,zoomSnap:0.25,preferCanvas:false,attributionControl:true,minZoom:8,maxZoom:17});
+map.attributionControl.setPrefix(false);
+const FULL=[[51.36,-0.99],[51.71,0.34]];
+map.fitBounds(FULL,{padding:[20,20]});
+["river","halos","lines","stations","crowd"].forEach((p,i)=>{map.createPane(p).style.zIndex=405+i*5});
+map.getPane("river").style.pointerEvents="none";
+
+let tiles=null;
+function addTiles(){ if(tiles)map.removeLayer(tiles);
+  tiles=L.tileLayer("https://{s}.basemaps.cartocdn.com/"+(isDark()?"dark_all":"light_all")+"/{z}/{x}/{y}{r}.png",
+   {subdomains:"abcd",maxZoom:19,attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'});
+  tiles.once("tileload",()=>{if(map.hasLayer(river))map.removeLayer(river)});
+  tiles.addTo(map);
+}
+// Thames, for orientation when no basemap is available.
+const THAMES=[[51.462,-0.965],[51.487,-0.905],[51.535,-0.900],[51.545,-0.83],[51.52,-0.70],[51.49,-0.64],[51.485,-0.605],[51.46,-0.565],[51.433,-0.51],[51.41,-0.41],[51.405,-0.37],[51.40,-0.34],[51.41,-0.31],[51.43,-0.32],[51.445,-0.315],[51.458,-0.307],[51.47,-0.295],[51.48,-0.285],[51.475,-0.255],[51.488,-0.235],[51.483,-0.222],[51.468,-0.215],[51.462,-0.19],[51.47,-0.18],[51.481,-0.17],[51.484,-0.155],[51.485,-0.135],[51.488,-0.124],[51.50,-0.121],[51.508,-0.118],[51.509,-0.104],[51.507,-0.087],[51.505,-0.075],[51.503,-0.058],[51.506,-0.045],[51.507,-0.032],[51.498,-0.027],[51.488,-0.024],[51.485,-0.007],[51.495,0.002],[51.507,0.006],[51.500,0.014],[51.497,0.03],[51.497,0.07],[51.505,0.10],[51.503,0.125],[51.511,0.15],[51.513,0.17],[51.50,0.205],[51.48,0.215],[51.465,0.26],[51.465,0.32]];
+const river=L.polyline(THAMES,{pane:"river",weight:7,color:tok("--river"),opacity:1,interactive:false,lineCap:"round",lineJoin:"round"}).addTo(map);
+
+const layers={};
+function seqToLatLngs(segs){return segs.map(seg=>seg.map(n=>S[n]).filter(Boolean))}
+LINES.forEach(l=>{
+  const ll=seqToLatLngs(l.segs);
+  const halo=L.polyline(ll,{pane:"halos",interactive:false,lineCap:"round",lineJoin:"round",opacity:0});
+  const main=L.polyline(ll,{pane:"lines",lineCap:"round",lineJoin:"round"});
+  main.bindTooltip(()=>{const st=state.status[l.id];return "<b>"+esc(l.name)+"</b><br>"+esc(st?st.desc:"No data")},{sticky:true});
+  main.on("click",e=>{L.DomEvent.stopPropagation(e);select(l.id)});
+  halo.addTo(map);main.addTo(map);
+  layers[l.id]={halo,main};
+});
+// Station dots, shown when zoomed in.
+const stationLayer=L.layerGroup();
+const usedStations=new Set();LINES.forEach(l=>l.segs.forEach(s=>s.forEach(n=>usedStations.add(n))));
+const stationDots=[];
+usedStations.forEach(n=>{if(!S[n])return;const m=L.circleMarker(S[n],{pane:"stations",radius:3,weight:1.5,fillOpacity:1});m.bindTooltip(esc(n),{direction:"top",offset:[0,-4]});stationDots.push(m);stationLayer.addLayer(m)});
+function syncStations(){const z=map.getZoom();if(z>=12){if(!map.hasLayer(stationLayer))stationLayer.addTo(map)}else if(map.hasLayer(stationLayer))map.removeLayer(stationLayer)}
+map.on("zoomend",()=>{syncStations();styleCrowd()});syncStations();
+// Crowding markers.
+const crowdLayer=L.layerGroup().addTo(map);const crowdMarkers={};
+CROWD.forEach(([nap,name])=>{if(!S[name])return;const m=L.circleMarker(S[name],{pane:"crowd",radius:0,weight:1.5,fillOpacity:.55,opacity:0,fillOpacity:0});
+  m.bindTooltip(()=>{const c=state.crowd[name];return "<b>"+esc(name)+"</b><br>"+(c&&c.pct!=null?Math.round(c.pct*100)+"% of typical busyness":"No crowding data")},{direction:"top"});
+  crowdMarkers[name]=m;crowdLayer.addLayer(m)});
+map.on("click",()=>{if(state.selected){state.selected=null;renderAll()}});
+
+function styleLines(){
+  LINES.forEach(l=>{const {halo,main}=layers[l.id];const st=state.status[l.id];const cls=st?st.cls:"unknown";
+    const sel=state.selected===l.id,hov=state.hover===l.id;
+    const calm=cls==="good"||cls==="closed"||cls==="unknown";
+    const dim=(state.focus&&calm&&!sel&&!hov)||(state.selected&&!sel&&!hov);
+    main.setStyle({color:lineColor(l.id),weight:sel||hov?7:(l.mode==="national-rail"?3:4.5),opacity:dim?.18:1,dashArray:cls==="severe"?"10 8":(l.mode==="national-rail"?"2 6":null)});
+    const alert=cls==="minor"||cls==="severe";
+    halo.setStyle({color:semColor(cls),weight:sel||hov?20:14,opacity:alert?(dim?.12:(sel||hov?.55:.33)):0});
+    if(sel||hov){halo.bringToFront();main.bringToFront()}
+  });
+  river.setStyle({color:tok("--river")});
+  const surf=tok("--surface"),ink=tok("--ink");stationDots.forEach(m=>m.setStyle({color:ink,fillColor:surf}));
+}
+function styleCrowd(){
+  CROWD.forEach(([nap,name])=>{const m=crowdMarkers[name];if(!m)return;const c=state.crowd[name];
+    if(!state.showCrowd||!c||c.pct==null){m.setStyle({opacity:0,fillOpacity:0});m.setRadius(0);return}
+    const col=crowdColor(c.pct);const k=map.getZoom()<11?.5:map.getZoom()<12.5?.75:1;m.setRadius((5+Math.min(c.pct,1.4)*13)*k);m.setStyle({color:col,fillColor:col,opacity:.9,fillOpacity:.38})});
+}
+
+// ---------- Sidebar ----------
+function lineRow(l){
+  const st=state.status[l.id]||{cls:"unknown",desc:state.mode==="connecting"?"Loading…":"No data",all:[]};
+  const sel=state.selected===l.id;
+  let detail="";
+  if(sel){const items=(st.all||[]).filter(a=>a.reason);
+    detail='<div class="detail">'+(items.length?items.map(a=>"<p>"+esc(a.reason)+"</p>").join(""):'<p class="muted">'+(st.cls==="good"?"Good service on the whole line.":esc(st.desc))+"</p>")+"</div>"}
+  return '<li><button type="button" class="row'+(sel?" is-sel":"")+'" data-id="'+l.id+'" aria-expanded="'+sel+'"><span class="sw" style="background:'+lineColor(l.id)+'"></span><span class="nm">'+esc(l.name)+"<small>"+MODE[l.mode]+'</small></span><span class="pill '+st.cls+'">'+esc(st.desc)+"</span></button>"+detail+"</li>";
+}
+function sortLines(arr){return arr.slice().sort((a,b)=>{const ra=RANK[(state.status[a.id]||{}).cls||"unknown"],rb=RANK[(state.status[b.id]||{}).cls||"unknown"];return rb-ra||a.name.localeCompare(b.name)})}
+function renderSidebar(){
+  $("corridor").innerHTML=CORRIDOR.map(id=>lineRow(byId[id])).join("");
+  $("lines").innerHTML=sortLines(LINES.filter(l=>!CORRIDOR.includes(l.id))).map(lineRow).join("");
+  let g=0,m=0,s=0;LINES.forEach(l=>{const c=(state.status[l.id]||{}).cls;if(c==="good")g++;else if(c==="minor")m++;else if(c==="severe"||c==="closed")s++});
+  const known=Object.keys(state.status).length>0;
+  $("nGood").textContent=known?g:"–";$("nMinor").textContent=known?m:"–";$("nSevere").textContent=known?s:"–";
+  const rows=CROWD.map(([n,name])=>({name,c:state.crowd[name]})).filter(r=>r.c&&r.c.pct!=null).sort((a,b)=>b.c.pct-a.c.pct);
+  const pending=CROWD.length-rows.length;
+  $("crowdList").innerHTML=rows.length?rows.map(r=>{const p=r.c.pct;return '<button type="button" class="crow" data-st="'+esc(r.name)+'"><span class="cn">'+esc(r.name)+'</span><span class="bar"><i class="'+crowdBand(p)+'" style="width:'+Math.min(100,p/1.2*100).toFixed(1)+'%"></i><em></em></span><span class="cv">'+Math.round(p*100)+"%</span></button>"}).join("")
+    :'<p class="note">'+(state.mode==="live"?"Loading station crowding…":"No crowding data yet.")+"</p>";
+  $("crowdNote").textContent=(state.mode==="example"?"Example values. ":"")+"Live busyness compared with a typical day at this time. The tick marks 100%."+(state.mode==="live"&&pending>0&&rows.length?" "+pending+" stations still loading.":"");
+}
+function renderAll(){renderSidebar();styleLines();styleCrowd()}
+function select(id){state.selected=state.selected===id?null:id;renderAll();
+  if(state.selected){const b=layers[id].main.getBounds();if(b.isValid())map.flyToBounds(b,{padding:[40,40],duration:.6,maxZoom:13})}}
+
+document.addEventListener("click",e=>{const r=e.target.closest(".row");if(r){select(r.dataset.id);return}
+  const c=e.target.closest(".crow");if(c&&S[c.dataset.st]){map.flyTo(S[c.dataset.st],14,{duration:.6});crowdMarkers[c.dataset.st]&&crowdMarkers[c.dataset.st].openTooltip()}});
+document.addEventListener("mouseover",e=>{const r=e.target.closest(".row");const id=r?r.dataset.id:null;if(id!==state.hover){state.hover=id;styleLines()}});
+$("chipFocus").addEventListener("click",e=>{state.focus=!state.focus;e.currentTarget.setAttribute("aria-pressed",state.focus);styleLines()});
+$("chipCrowd").addEventListener("click",e=>{state.showCrowd=!state.showCrowd;e.currentTarget.setAttribute("aria-pressed",state.showCrowd);styleCrowd()});
+$("chipFit").addEventListener("click",()=>{state.selected=null;renderAll();map.flyToBounds(FULL,{padding:[20,20],duration:.6})});
+$("refresh").addEventListener("click",()=>{loadStatus();if(state.mode==="live")loadCrowding()});
+const keyIn=$("tflKey");keyIn.value=store.get("tflKey")||"";keyIn.addEventListener("change",()=>{store.set("tflKey",keyIn.value.trim());loadStatus()});
+
+function setSource(mode){state.mode=mode;const el=$("src");el.className="src "+mode;
+  $("srcTxt").textContent=mode==="live"?"Live · TfL":mode==="example"?"Example data":"Connecting…";
+  $("banner").hidden=mode!=="example"}
+
+// ---------- Data loading ----------
+const IDS=LINES.map(l=>l.id).join(",");
+function applyStatus(arr){const out={};
+  arr.forEach(l=>{const ss=l.lineStatuses||[];let worst=null;
+    const all=ss.map(s=>({cls:classify(s.statusSeverity),desc:s.statusSeverityDescription,reason:s.reason||""}));
+    all.forEach(a=>{if(!worst||RANK[a.cls]>RANK[worst.cls])worst=a});
+    if(worst)out[l.id]={cls:worst.cls,desc:worst.desc,all}});
+  state.status=out}
+async function loadStatus(){
+  try{const data=await enqueue(()=>getJSON("/Line/"+IDS+"/Status"),true);
+    applyStatus(data);const wasLive=state.mode==="live";setSource("live");$("upd").textContent=hhmmss(new Date());renderAll();
+    if(!wasLive){loadCrowding();loadGeometry()}
+  }catch(err){
+    if(state.mode!=="live"){
+      applyStatus(LINES.map(l=>({id:l.id,lineStatuses:(EXAMPLE_STATUS[l.id]||[{s:10,d:"Good Service",r:""}]).map(x=>({statusSeverity:x.s,statusSeverityDescription:x.d,reason:x.r}))})));
+      Object.entries(EXAMPLE_CROWD).forEach(([n,p])=>state.crowd[n]={pct:p});
+      setSource("example");$("upd").textContent=hhmmss(new Date());renderAll();
+    }
+  }
+}
+let crowdRunning=false;
+async function loadCrowding(){if(crowdRunning)return;crowdRunning=true;
+  for(const [nap,name] of CROWD){
+    try{const d=await enqueue(()=>getJSON("/crowding/"+nap+"/Live"));
+      const p=d&&d.dataAvailable!==false?(d.percentageOfBaseline??d.percentageOfBaseLine):null;
+      state.crowd[name]={pct:typeof p==="number"?p:null,time:d&&d.timeLocal};
+    }catch(e){state.crowd[name]={pct:null}}
+    renderSidebar();styleCrowd();
+  }
+  crowdRunning=false}
+async function loadGeometry(){
+  const day=new Date().toISOString().slice(0,10);
+  for(const l of LINES){ if(l.mode==="national-rail")continue;
+    let ll=null;const cached=store.get("geo:"+l.id);
+    if(cached){try{const c=JSON.parse(cached);if(c.day===day)ll=c.ll}catch(e){}}
+    if(!ll){try{const d=await enqueue(()=>getJSON("/Line/"+l.id+"/Route/Sequence/all"));
+        ll=[];(d.lineStrings||[]).forEach(s=>{try{JSON.parse(s).forEach(part=>ll.push(part.map(([lon,lat])=>[+lat.toFixed(5),+lon.toFixed(5)])))}catch(e){}});
+        if(ll.length)store.set("geo:"+l.id,JSON.stringify({day,ll}));else ll=null}catch(e){ll=null}}
+    if(ll){layers[l.id].main.setLatLngs(ll);layers[l.id].halo.setLatLngs(ll)}
+  }}
+
+// Theme changes restyle map colours.
+const reTheme=()=>{renderAll();if(tiles)addTiles()};
+new MutationObserver(reTheme).observe(document.documentElement,{attributes:true,attributeFilter:["data-theme"]});
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change",reTheme);
+
+addTiles();renderAll();loadStatus();
+requestAnimationFrame(()=>{map.invalidateSize();map.fitBounds(FULL,{padding:[20,20]})});setTimeout(()=>{map.invalidateSize();map.fitBounds(FULL,{padding:[20,20]})},400);
+setInterval(loadStatus,60000);
+setInterval(()=>{if(state.mode==="live")loadCrowding()},300000);
+window.addEventListener("resize",()=>map.invalidateSize());
+})();
+</script>
+
+</body>
+</html>
