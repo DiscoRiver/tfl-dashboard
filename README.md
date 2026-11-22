@@ -12,4 +12,4 @@ The page calls the [TfL Unified API](https://api.tfl.gov.uk) straight from the b
 
 Settings → Pages → Deploy from a branch → `main` / root.
 
-Powered by TfL Open Data. Basemap © OpenStreetMap contributors © CARTO.
+Powered by TfL Open Data. Basemap © OpenStreetMap contributors.

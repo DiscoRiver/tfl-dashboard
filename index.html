@@ -17,6 +17,7 @@
   --accent:#1f4fd1; --map:#e3e8ed; --river:#b8d2e6;
   --good:#1d8a4b; --minor:#b87d00; --severe:#c8322b; --closed:#7a8794;
   --quiet:#3a9d6a; --moderate:#d49a1a; --busy:#d2452f;
+  --tile-filter:saturate(.35) contrast(.92) brightness(1.04);
   --f-display:"Archivo","Helvetica Neue",Arial,sans-serif;
   --f-body:"Inter",system-ui,-apple-system,"Segoe UI",sans-serif;
   --f-mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
@@ -25,12 +26,12 @@
   --bg:#0e1318; --surface:#151c23; --sunk:#111820; --ink:#e5ebf0; --muted:#94a4b3; --rule:#25303a;
   --accent:#8aaeff; --map:#121920; --river:#1d3346;
   --good:#3fbf74; --minor:#f0b429; --severe:#ff6b5e; --closed:#7d8b98;
-  --quiet:#46b97c; --moderate:#e9ae32; --busy:#ff6a52; color-scheme:dark}}
+  --quiet:#46b97c; --moderate:#e9ae32; --busy:#ff6a52; --tile-filter:invert(1) hue-rotate(180deg) saturate(.3) brightness(.85) contrast(.9); color-scheme:dark}}
 :root[data-theme="dark"]{
   --bg:#0e1318; --surface:#151c23; --sunk:#111820; --ink:#e5ebf0; --muted:#94a4b3; --rule:#25303a;
   --accent:#8aaeff; --map:#121920; --river:#1d3346;
   --good:#3fbf74; --minor:#f0b429; --severe:#ff6b5e; --closed:#7d8b98;
-  --quiet:#46b97c; --moderate:#e9ae32; --busy:#ff6a52; color-scheme:dark}
+  --quiet:#46b97c; --moderate:#e9ae32; --busy:#ff6a52; --tile-filter:invert(1) hue-rotate(180deg) saturate(.3) brightness(.85) contrast(.9); color-scheme:dark}
 
 html,body{height:100%}
 body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:14px;line-height:1.45;
@@ -125,6 +126,7 @@ footer input{font:inherit;font-family:var(--f-mono);width:14em;padding:2px 6px;b
 .leaflet-container{overflow:hidden;-webkit-tap-highlight-color:transparent;font-family:var(--f-body);outline-offset:1px}
 .leaflet-tile,.leaflet-marker-icon{user-select:none;-webkit-user-drag:none}
 .leaflet-container img.leaflet-tile{max-width:none!important;max-height:none!important;width:256px;height:256px}
+.leaflet-tile-pane{filter:var(--tile-filter)}
 .leaflet-tile{visibility:hidden}.leaflet-tile-loaded{visibility:inherit}
 .leaflet-container .leaflet-overlay-pane svg{max-width:none!important;max-height:none!important}
 .leaflet-touch-zoom{touch-action:pan-x pan-y}.leaflet-touch-drag{touch-action:none}.leaflet-touch-drag.leaflet-touch-zoom{touch-action:none}
@@ -454,8 +456,8 @@ map.getPane("river").style.pointerEvents="none";
 
 let tiles=null;
 function addTiles(){ if(tiles)map.removeLayer(tiles);
-  tiles=L.tileLayer("https://{s}.basemaps.cartocdn.com/"+(isDark()?"dark_all":"light_all")+"/{z}/{x}/{y}{r}.png",
-   {subdomains:"abcd",maxZoom:19,attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'});
+  tiles=L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+   {maxZoom:19,attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'});
   tiles.once("tileload",()=>{if(map.hasLayer(river))map.removeLayer(river)});
   tiles.addTo(map);
 }
@@ -588,7 +590,7 @@ async function loadGeometry(){
   }}
 
 // Theme changes restyle map colours.
-const reTheme=()=>{renderAll();if(tiles)addTiles()};
+const reTheme=()=>renderAll();
 new MutationObserver(reTheme).observe(document.documentElement,{attributes:true,attributeFilter:["data-theme"]});
 matchMedia("(prefers-color-scheme: dark)").addEventListener("change",reTheme);
 
